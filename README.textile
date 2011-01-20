@@ -1,13 +1,112 @@
-h1. Doxia macro for yuml.me
-
-*Include UML diagrams in your Maven site*
-
-This macro for Doxia provides an easy way to include UML diagrams in your project documentation. The macro uses the "yuml.me":http://yuml.me site to generate the diagrams, and makes it possible to describe the models in yuml.me's textual syntax directly in, for instance, "APT":http://maven.apache.org/doxia/references/apt-format.html documents.
 
 
-h2. Documentation
+h1. Feeding more of that fast build-test-code loop addiction
 
-Please see the official site at "http://flobakk.org/yuml-doxia-macro":http://flobakk.org/yuml-doxia-macro for documentation on how to use the macro.
+h2. Recepie
 
+After using ruby rspec autotest and spork for a while i got addicted. The enormous speed and satisfaction you get from
+being able to run your tests on every save. The quick feedback loop makes my day a joy. I thought this was a dynamic
+language feature, turns out its a build system feature. I came to the conclusion after doing scala and sbt development.
+And now i am going to show how you can get this killer feature in your pure java project. This is a write up of transforming
+a maven project made by Rune Flobakk. You can find my fork at https://github.com/aslakjo/yuml-doxia-macro
 
+Most likely you are using maven for you builds. If not read on any way sbt will probably be able to help you as well.
+After ensuring that ''mvn test'' runs green, run sbt in your project folder. It will ask you some questions about your
+project, sbt version and scala version. In a javaproject, you are well of by using the defaults. You have now downloaded
+scala but you will probably want to use that in the future any way.
 
+Sbt is now running, and all commands from her on is issued inside the console. This saves you from that pesky jvm boot
+delay. In sbt dependencies are specified through a project class rather than in a xml file. It is located under
+project/build/Project.scala. The name of the class can be anything you like. Sbt will not require you to have a build
+and project class, however to configure to do more than the absolute basic you have to create one.
+
+I have created the following:
+
+import sbt._
+
+class Project(info: ProjectInfo) extends DefaultProject(info){
+
+  val doxiaCore = "org.apache.maven.doxia" %  "doxia-core" % "1.1.2"
+  val doxiaApi =  "org.apache.maven.doxia" %  "doxia-sink-api" % "1.1.2"
+  val commonsLang = "commons-lang" % "commons-lang" % "2.5"
+
+  val mockito = "org.mockito" % "mockito-all" % "1.8.4" % "test"
+  val junit = "junit" % "junit" % "4.8.2" % "test"
+}
+
+As you can see this scala code, and we extend DefaultProject. It is located in sbt.DefaultProject hence the import. In
+sbt you have to run ''update'' explicitly in contrast to maven where it is done whenever.
+
+Each of the pom.xml dependencies like this
+
+<dependency>
+    <groupId>org.apache.maven.doxia</groupId>
+    <artifactId>doxia-core</artifactId>
+    <version>1.1.2</version>
+</dependency>
+
+is translated into
+
+val doxiaCore = "org.apache.maven.doxia" %  "doxia-core" % "1.1.2"
+
+the "magic" lies in the % which is part of the sbt DSL for specifying dependencies. Now by running;
+''reload'', which recompiles the project file it self.
+''update'', which downloads all the dependencies and
+''compile'', which.. compiles the source and now runs.
+
+Woho the project is build with sbt.
+
+h2. T for test in that test-code-build loop
+
+By running ''test'', sbts testing command, you'll see that something is'nt ok. None of the tests are executed. Since sbt
+normally uses scala test frameworks it is'nt accustom to jUnit. Lucky for us sbt is easily extended and some one has done
+it before us. Got to love that community!
+
+To make sbt understand jUnit we have to change the project file to use a jUnit interface. Like so:
+
+import sbt._
+
+class Project(info: ProjectInfo) extends DefaultProject(info){
+
+  val doxiaCore = "org.apache.maven.doxia" %  "doxia-core" % "1.1.2"
+  val doxiaApi =  "org.apache.maven.doxia" %  "doxia-sink-api" % "1.1.2"
+  val commonsLang = "commons-lang" % "commons-lang" % "2.5"
+
+  val mockito = "org.mockito" % "mockito-all" % "1.8.4" % "test"
+  val junit = "junit" % "junit" % "4.8.2" % "test"
+
+  val bryanjswift = "Bryan J Swift Repository" at "http://repos.bryanjswift.com/maven2/"
+  val junitInterface = "com.novocode" % "junit-interface" % "0.4.0" % "test"
+
+  override def testFrameworks = super.testFrameworks ++ List(new TestFramework("com.novocode.junit.JUnitFrameworkNoMarker"))
+
+}
+
+This makes sbt understand jUnit test suites in the same way as it understands spec and scalatest. The junit-interface
+is located in Bryan J Swifts repo which we refereed to by doing;
+
+val bryanjswift = "Bryan J Swift Repository" at "http://repos.bryanjswift.com/maven2/"
+
+Where ''at'' is the keyword telling sbt that Bryans repo is located at the url. So fluent that i nearly never look
+it up. Nice! The next cool thing is that we override the testFrameworks method and make it return the original frameworks appending
+the jUnit interface. This is a good example of you extend sbt.
+
+Now by running ''reload'', ''update'' and ''test'' we are in business.
+
+h2. L in loop in that test-code-build loop
+
+To be able to get sbt to keep up with your pace there is a special command ''~''. What ''~'' does is run the command
+preceding it for every change on the file system. Which in practice is every time you save a file. This is the same
+mechanism autotest uses to keep up with your ruby coding.
+
+So we are now familiar with the ''~test'' but still I want to get back to ruby and autotest. Since autotest understands
+which tests are required to run it does'nt run all the others. A nifty feature that saves me a lot of time. Autotest is
+only guessing which files it need to run based on the location and name of the files you just saved. Sbt can do the very
+same thing, but sbt can base the selection on which classes you changed and which tests are dependent on those. Sbt does
+this when you say ''test-quick''
+
+So there we are back in that crazy test-build-code loop, but only now we are writing java.
+
+ ~ test-quick
+
+ 
