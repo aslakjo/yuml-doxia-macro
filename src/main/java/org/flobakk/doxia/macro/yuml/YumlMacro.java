@@ -24,4 +24,5 @@ public class YumlMacro extends AbstractMacro {
         sink.figureGraphics(url, null);
         sink.figure_();
     }
+
 }
